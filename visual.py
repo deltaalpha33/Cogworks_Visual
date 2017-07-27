@@ -15,9 +15,9 @@ import skimage.io as io
 
 import numpy as np
 
-import glob
-
 import os
+
+from collections import Counter
 
 class Photo():
     def __init__(self):
@@ -49,7 +49,8 @@ class Photo():
         self.detections = list(self.detections)
         
         for det in self.detections:    
-            new_face = Face(self.img_array, det)
+            new_face = Face()
+            new_face.create_from_photo(self.img_array, det)
             self.faces.append(new_face)
             
     def display_picture(self):
@@ -64,17 +65,26 @@ class Photo():
         ax.imshow(self.img_array)
 
 class Face():
-    def __init__(self, img_data, det):
+    def __init__(self, descriptor=None, label=""):
+        #only used in displaying face from a photo
+        self.box = None
+        self.text_loc = None
+        self.from_photo = False
+        
+        self.descriptor = descriptor
+        
+        self.label = label #name
+        self.unknown =  True ##true if correct label is not known
+        
+    def create_from_photo(self, img_data, det):
+        self.from_photo = True
         l, r, t, b = det.left(), det.right(), det.top(), det.bottom() 
         self.box = (((r,b), l - r, t-b))
         self.text_loc = (l, b)
         
         
-        self.shape = shape_predictor(img_data, det)
-        self.descriptor = np.array(face_rec_model.compute_face_descriptor(img_data, self.shape))
-        
-        self.label = "" #name
-        self.unknown =  True ##true if correct label is not known
+        shape = shape_predictor(img_data, det)
+        self.descriptor = np.array(face_rec_model.compute_face_descriptor(img_data, shape))
 
 class Photo_Database():
     def __init__(self,img_dirt = "photo_db", vector_dirt = "vectors"):
@@ -175,28 +185,53 @@ class Photo_Database():
                 face.unknown = False
                 self.database.append(face) #add labeled face to database
                 
-    def saveDBnp(dir = "/database"):
+    def saveDBnp(self, dirt = "database"):
         """
         Saves a db to directory dirt.
-
-        splt = \ in windows
-             = / in mac
         """
-        it = 0
-        prevname = db[0][1]
-        for entr in db:
-            ray, name = entr[0],entr[1]
-            if name != prevname:
-                prevname = name
-                it = 0
-            direc = dirt + splt + name
+        dirt = os.path.join(os.getcwd() , dirt) ##local working directory
+        
+        ##sort database
+        extension_numbers = Counter() ##counts what the extension should be for each persons face
+        for face in self.database:
+            direc = dirt + self.split + face.label
 
             if not os.path.exists(direc):
                 os.makedirs(direc)
 
 
-            direc = direc + splt +"vct" + str(it)
+            direc = direc + self.split +"vct" + str(extension_numbers[face.label])
+            extension_numbers[face.label] += 1
 
-            np.savez(direc,ray=ray)
-            it = it + 1
+            np.save(direc, face.descriptor)
+            
+    def loadDBnp(self , dirt = "database"):
+        """
+        Loads a db from directory dirt.
+        Dirt must be formated like such:
+        Folders with names of the desired labels (ie: 'Daschel Cooper')
+        Within them .npz files storing arrays
+        """
+        dirt = os.path.join(os.getcwd() , dirt) ##local working directory
+        
+        lstOfDirs = [x[0] for x in os.walk(dirt)][1:]
+        self.database = list()
+        for rootDir in lstOfDirs:
+            #print(rootDir)
+            fileList = list()
+            for dir_, _, files in os.walk(rootDir):
+                for fileName in files:
+                    relFile = os.path.join(rootDir, fileName)
+                    if not fileName.startswith('.'):
+                        fileList.append(relFile)
+                    #print(fileName)
+
+            for file in fileList:
+                #with load(file) as vector:
+                vector = np.load(file)
+                name = rootDir.split(self.split)[-1]
+                #print(name)
+                new_face = Face(descriptor = vector, label = name)
+                #print(new_face.descriptor)
+                self.database.append( new_face)
 
