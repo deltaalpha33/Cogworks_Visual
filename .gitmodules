@@ -1,3 +1,6 @@
 [submodule "Camera"]
 	path = Camera
 	url = https://github.com/LLCogWorks2017/Camera.git
+[submodule "DlibModels"]
+	path = DlibModels
+	url = https://github.com/LLCogWorks2017/DlibModels.git
