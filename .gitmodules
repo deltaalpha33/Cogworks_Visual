@@ -1,0 +1,3 @@
+[submodule "Camera"]
+	path = Camera
+	url = https://github.com/LLCogWorks2017/Camera.git
